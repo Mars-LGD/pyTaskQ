@@ -1,10 +1,14 @@
 #!/usr/bin/python
 #coding:utf-8
 
+import gc
+gc.disable()
+
 import os
 import sys
 import time
 import threading
+import subprocess
 import logging
 try:
     import simple_json as json
@@ -13,11 +17,11 @@ except:
 
 import MySQLdb
 import torndb
-from tornado import httpclient, gen, ioloop, queues
+from tornado import httpclient, gen, ioloop, queues, process
 from tornado.web import RequestHandler, Application, url
 
 nr_jobSaver = 1
-nr_jobConsumer = 3
+nr_jobConsumer = 4
 
 db_conf = {
     'host': '127.0.0.1',
@@ -84,11 +88,17 @@ class Job(object):
         self.setState(self.JOB_PROCESSING)
 
         Log("[JOB:%d] process", self.d['id'])
-        result = 0 #TODO: process
+        cmd = './processor/' + self.d['processor']
+        argv = [cmd, str(self.d['id']), self.d['args']]
+        sp = process.Subprocess(argv)
+        sp.set_exit_callback(self.process_callback)
 
-        if result == 0:
+    def process_callback(self, exit_code):
+        if exit_code == 0:
+            Log("[JOB:%d] finish", self.d['id'])
             self.setState(self.JOB_FINISH)
         else:
+            Log("[JOB:%d] fail", self.d['id'])
             self.setState(self.JOB_FAIL)
 
 def Log(message, *args):
@@ -177,7 +187,7 @@ class JobSaver(threading.Thread):
         global RequestQueue
         global ProcessQueue
         while True:
-            yield gen.sleep(1) #TODO: for test
+            #yield gen.sleep(1) #TODO: for test
             job = yield RequestQueue.get()
             job.saveToMySQL()
             job.saveToQueue(ProcessQueue)
@@ -192,7 +202,7 @@ class JobConsumer(threading.Thread):
         Log("[jc:%d] run" % self._id)
         global ProcessQueue
         while True:
-            yield gen.sleep(1.5) #TODO: for test
+            yield gen.sleep(0.5) #TODO: for test
             job = yield ProcessQueue.get()
             job.process()
 

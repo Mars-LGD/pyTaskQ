@@ -1,0 +1,11 @@
+#!/usr/bin/env php
+<?php
+
+$job_id = $argv[1];
+$args   = json_decode($argv[2], true);
+
+echo "Job: $job_id\nargs: ";
+print_r($args);
+
+exit(0); //success
+//exit(1); //fail
